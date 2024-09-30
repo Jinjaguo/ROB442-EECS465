@@ -1,5 +1,6 @@
+# University of Michigan Ann-arbor
 # ROB442-EECS465
-EECS 465/ROB 422: Introduction to Algorithmic Robotics Fall 2024
+EECS 465/ROB 422: Introduction to Algorithmic Robotics Fall 2024  
 https://berenson.robotics.umich.edu/courses/fall2024iar/index.html  
 
 ## Instructor:
