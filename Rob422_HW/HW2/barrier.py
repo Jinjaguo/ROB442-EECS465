@@ -33,10 +33,12 @@ if __name__ == "__main__":
     beta = 0.6  # for back-tracking line search
 
     # these are defined as [a b]
-    hyperplanes = np.asmatrix([[0.7071, 0.7071, 1.5],
-                          [-0.7071, 0.7071, 1.5],
-                          [0.7071, -0.7071, 1],
-                          [-0.7071, -0.7071, 1]])
+    hyperplanes = np.asmatrix([
+        [0.7071, 0.7071, 1.5],
+        [-0.7071, 0.7071, 1.5],
+        [0.7071, -0.7071, 1],
+        [-0.7071, -0.7071, 1]
+    ])
 
     # number of hyperplanes in this problem
     numplanes = hyperplanes.shape[0]
@@ -77,24 +79,24 @@ if __name__ == "__main__":
             fprime = t * c  ###YOUR CODE HERE###
 
             # compute fprimeprime for just the optimization force first
-            fprimeprime = np.zeros((x.shape[0], x.shape[0]))  ###YOUR CODE HERE###
+            fprimeprime = 0  ###YOUR CODE HERE###
 
             # compute the first and second derivatives from each hyperplane and aggregate
             for j in range(0, numplanes):
-                fprime_for_plane_j = a[:, j] / (b[j] - a[:, j].T * x)  ###YOUR CODE HERE###
+                fprime_for_plane_j = a[:, j] / (b[j] - a[:, j].T @ x)  ###YOUR CODE HERE###
 
-                fprimeprime_for_plane_j = a[:, j] * a[:, j].T / (b[j] - a[:, j].T * x) ** 2  ###YOUR CODE HERE###
+                fprimeprime_for_plane_j = (a[:, j] @ a[:, j].T) / (b[j] - a[:, j].T @ x) ** 2  ###YOUR CODE HERE###
 
-                fprime = fprime - fprime_for_plane_j  # put in the contribution of hyperplane j to fprime
+                fprime = fprime + fprime_for_plane_j  # put in the contribution of hyperplane j to fprime
                 fprimeprime = fprimeprime + fprimeprime_for_plane_j  # put in the contribution of hyperplane j to fprimeprime
 
             # you might want to print fprime and fprimeprime here to debug (but it will slow things down)
 
             # the step according to Newton's method (in terms of fprime and fprimeprime)
-            step = -np.linalg.inv(fprimeprime) * fprime  ###YOUR CODE HERE###
+            step = -np.linalg.inv(fprimeprime) @ fprime  ###YOUR CODE HERE###
 
             # compute the Newton decrement squared (in terms of step and fprimeprime)
-            lambda2 = fprime.T * np.linalg.inv(fprimeprime) * fprime  ###YOUR CODE HERE###
+            lambda2 = fprime.T @ (-step)  ###YOUR CODE HERE###
 
             # check if we've reached the Newton's method stopping condition
             # if so, break out of Newton's method
@@ -102,7 +104,7 @@ if __name__ == "__main__":
                 break
 
             # now we have a direction to move the point x (i.e. the Newton step) but we don't
-            # know how far to move in that direction
+            # know how far to move in that direction,
             # so we look along the direction for the biggest step we can take which doesn't jump
             # over a barrier or move to a higher-cost location
             # the method we use here is called back-tracking line search
