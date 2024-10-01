@@ -22,7 +22,6 @@ class ControlIndices:
 class CarEnvironment:
     """Simplified Dubin's car environment"""
 
-
     def __init__(self):
         # plotting
         self.fig = plt.gcf()
@@ -36,31 +35,24 @@ class CarEnvironment:
 
         self.fig.suptitle('Press Space Bar to End Run', fontsize=14, fontweight='bold')
 
-        #set up the space bar call back for ending early        
+        # set up the space bar call back for ending early
         def onpress(event):
             global bKeepRunning
-            
+
             if event.key == ' ':
                 if bKeepRunning == False:
-                    #plot is already stopped, exit
+                    # plot is already stopped, exit
                     exit()
                 else:
                     bKeepRunning = False
                     print('Ending the run')
-                    #self.fig.suptitle('Press Space Bar to Close Program', fontsize=14, fontweight='bold', color='red')
+                    # self.fig.suptitle('Press Space Bar to Close Program', fontsize=14, fontweight='bold', color='red')
 
- 
-        self.fig.canvas.mpl_connect('key_press_event', onpress)   
-        
+        self.fig.canvas.mpl_connect('key_press_event', onpress)
 
         plt.ion()
         plt.show()
         self.state_history = []
-
-
-     
-
-         
 
     def visualize_state(self, state, name='current', color=(0, 0, 0), plot_trail=True):
         """Draw a state"""
@@ -81,7 +73,8 @@ class CarEnvironment:
         dx = arrow_length * c
         dy = arrow_length * s
         car_artists.append(
-            plt.arrow(state[StateIndices.X], state[StateIndices.Y], dx, dy, width=arrow_length / 10, ec=color, fc=color, label=name))
+            plt.arrow(state[StateIndices.X], state[StateIndices.Y], dx, dy, width=arrow_length / 10, ec=color, fc=color,
+                      label=name))
 
         # plot rectangle instead of point to represent robot
         # car_artists.append(plt.scatter(state[StateIndices.X], state[StateIndices.Y], color=c, label=name))
@@ -92,7 +85,8 @@ class CarEnvironment:
                         [s, c]])
         offset = rot @ offset
         car_artists.append(plt.Rectangle((state[StateIndices.X] + offset[0],
-                                          state[StateIndices.Y] + offset[1]), w, h, angle=state[StateIndices.HEADING] * 180 / np.pi,
+                                          state[StateIndices.Y] + offset[1]), w, h,
+                                         angle=state[StateIndices.HEADING] * 180 / np.pi,
                                          ec=color, fc=color, fill=False))
         self.ax.add_artist(car_artists[-1])
 
@@ -143,17 +137,20 @@ def linearize_dynamics_numerically(x_r, u_r, h, true_dynamics):
     # Jacobian (m, n) where m is the output dimension, n is the input dimension
     Jacobian = np.zeros((m, n))
 
+    # Implement Newton's difference quotient using h
+    for i in range(n):
+        # Create a small perturbation vector
+        perturbation = np.zeros(n)
+        perturbation[i] = h
 
-    #Implement Newton's difference quotient using h
-    #### YOUR CODE HERE ####
+        # Evaluate the function at the perturbed input
+        f_perturbed = f(xu_r + perturbation)
 
+        # Compute the difference quotient for the i-th partial derivative
+        Jacobian[:, i] = (f_perturbed - f_r) / h
 
-
-
-    #### YOUR CODE HERE ####
-
-    A = Jacobian[:, :3] # the left half of the Jacobian is A
-    B = Jacobian[:, 3:] # the right half of the Jacobian is B
+    A = Jacobian[:, :3]  # the left half of the Jacobian is A （3*3）
+    B = Jacobian[:, 3:]  # the right half of the Jacobian is B（3*2）
     return A, B
 
 
@@ -178,26 +175,23 @@ def optimize_single_action(goal_state, current_state, reference_control, A, B, s
     """
 
     # single step control
-    #define a cvx.Variable for the control
+    # define a cvx.Variable for the control
     control = cvx.Variable(B.shape[1])
-    
-    #define the control constraints and the objective, then use cvxpy to solve the QP
+
+    # define the control constraints and the objective, then use cvxpy to solve the QP
     ### YOUR CODE HERE ###
-
-
 
     ### YOUR CODE HERE ###
 
     if control.value is not None:
         return control.value
     else:
-        #control has not been computed
+        # control has not been computed
         return np.zeros(B.shape[1])
 
 
 def run_problem(probname, start_state, goal_state,
                 h_in=0.1, reference_control=np.array([0.5, 0.]), speed_limit=(0, 1), turn_limit=(-2, 2)):
-
     global bKeepRunning
 
     car = CarEnvironment()
@@ -213,16 +207,15 @@ def run_problem(probname, start_state, goal_state,
     MaxSteps = 40
 
     for i in range(MaxSteps):
-        if(not bKeepRunning):
+        if (not bKeepRunning):
             break
         # A, B = linearize_dynamics(state, reference_control, t=t)
         A, B = linearize_dynamics_numerically(state, reference_control, h=h_in, true_dynamics=car.true_dynamics)
         control = optimize_single_action(goal_state, state, reference_control, A, B, speed_limit, turn_limit)
-        
-        
+
         # use our linearized dynamics to predict next state under this control
-	# predicted state should be state + (A @ state-state) + (B @ (control-reference_control)), because we linearize about the current state, which we assume is an equilibrium point and state - state = 0, we have:
-        predicted_state = state + B @ (control-reference_control)
+        # predicted state should be state + (A @ state-state) + (B @ (control-reference_control)), because we linearize about the current state, which we assume is an equilibrium point and state - state = 0, we have:
+        predicted_state = state + B @ (control - reference_control)
 
         # check that control is within bounds
         if not (speed_limit[0] - tol < control[ControlIndices.SPEED] < speed_limit[1] + tol
@@ -233,29 +226,28 @@ def run_problem(probname, start_state, goal_state,
 
         state = car.true_dynamics(state, control)
         prediction_error.append(state - predicted_state)
-        #print(np.sum((goal_state - predicted_state)**2))
+        # print(np.sum((goal_state - predicted_state)**2))
         car.visualize_state(predicted_state, name='predicted', color=(0.7, 0, 0), plot_trail=False)
         car.visualize_state(state)
 
-        #if control is close to 0, end
-        if(np.linalg.norm(control) < tol):
+        # if control is close to 0, end
+        if (np.linalg.norm(control) < tol):
             break
-
 
     bKeepRunning = False
     car.fig.suptitle('Press Space Bar to Close Program', fontsize=14, fontweight='bold', color='red')
-    #car.save_plot(os.path.join(SCRIPT_DIR, "{}.png".format(name)))
-    
-    print('Distance to goal:\n',np.linalg.norm((goal_state - state)))
-    
-    #prediction_error = np.stack(prediction_error)
-    #print("max prediction error: {}".format(np.max(prediction_error)))
+    # car.save_plot(os.path.join(SCRIPT_DIR, "{}.png".format(name)))
+
+    print('Distance to goal:\n', np.linalg.norm((goal_state - state)))
+
+    # prediction_error = np.stack(prediction_error)
+    # print("max prediction error: {}".format(np.max(prediction_error)))
 
 
 if __name__ == "__main__":
 
     args = sys.argv[1:]
-    if(len(args)==0):
+    if (len(args) == 0):
         print("Specify what to run:")
         print("  'python3 carqp.py test_linearization' will test the numerical linearization method")
         print("  'python3 carqp.py run_test [test index]' will run the simulation for a specific test index (0-2)")
@@ -266,7 +258,7 @@ if __name__ == "__main__":
         current_state = np.array([0.2, 0.1, 0.4])
         reference_control = np.array([0., 0.])
         test_control = np.array([0.1, 0.2])
-        h=0.01
+        h = 0.01
 
         print('Testing linearization of dynamics for')
         print('  Current state:')
@@ -279,42 +271,40 @@ if __name__ == "__main__":
         A, B = linearize_dynamics_numerically(current_state, reference_control, h=h, true_dynamics=car.true_dynamics)
         print('A:\n', A)
         print('B:\n', B)
-        
-        print('\nTest control:')
-        print('   ',test_control)
 
-        #get prediction 
-        predicted_nextx = current_state.T + A @ (current_state.T-current_state.T) + B @ (test_control.T - reference_control.T)
-        
-        #get true next state
-        true_nextx = car.true_dynamics(current_state,test_control)
-        
+        print('\nTest control:')
+        print('   ', test_control)
+
+        # get prediction
+        predicted_nextx = current_state.T + A @ (current_state.T - current_state.T) + B @ (
+                test_control.T - reference_control.T)
+
+        # get true next state
+        true_nextx = car.true_dynamics(current_state, test_control)
+
         print('\nPredicted state using linearized dynamics Ax + Bu:')
         print('  ', predicted_nextx)
         print('True state (using true dynamics):')
-        print('  ',true_nextx)
+        print('  ', true_nextx)
         print('Prediction error:')
-        print('  ',np.linalg.norm(predicted_nextx-true_nextx))
+        print('  ', np.linalg.norm(predicted_nextx - true_nextx))
 
         exit()
 
-    elif args[0]=='run_test':
+    elif args[0] == 'run_test':
         try:
             testind = int(args[1])
         except:
             print("ERROR: Test index has not been specified")
             exit()
 
-
-
-        #state format is [x, y, theta]
+        # state format is [x, y, theta]
         start_state = np.array([0., 0., 0.])
-        goal_states = np.array([[0.6, 0.4, 1],  #test 0
-                                [0.7, -0.6, -1], #test 1
-                                [0.8, -0.3, -1.5]]) #test 2
-
+        goal_states = np.array([[0.6, 0.4, 1],  # test 0
+                                [0.7, -0.6, -1],  # test 1
+                                [0.8, -0.3, -1.5]])  # test 2
 
         run_problem(testind, start_state, goal_states[testind], h_in=0.01, reference_control=np.array([0.0, 0.0]))
-        
-        #wait until the plot closes
+
+        # wait until the plot closes
         plt.show(block=True)
