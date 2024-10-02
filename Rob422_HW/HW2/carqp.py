@@ -179,9 +179,23 @@ def optimize_single_action(goal_state, current_state, reference_control, A, B, s
     control = cvx.Variable(B.shape[1])
 
     # define the control constraints and the objective, then use cvxpy to solve the QP
-    ### YOUR CODE HERE ###
+    # Predicted next state using the linearized dynamics
+    next_state = A @ current_state + B @ control
 
-    ### YOUR CODE HERE ###
+    # Define the objective: minimize the distance to the goal state
+    objective = cvx.Minimize(cvx.norm(goal_state - next_state, 2))
+
+    # Define the constraints for the control inputs
+    constraints = [
+        control[0] >= speed_limit[0],  # Speed lower bound
+        control[0] <= speed_limit[1],  # Speed upper bound
+        control[1] >= turn_limit[0],  # Turn rate lower bound
+        control[1] <= turn_limit[1]  # Turn rate upper bound
+    ]
+
+    # Define and solve the optimization problem
+    problem = cvx.Problem(objective, constraints)
+    problem.solve()
 
     if control.value is not None:
         return control.value
@@ -207,7 +221,7 @@ def run_problem(probname, start_state, goal_state,
     MaxSteps = 40
 
     for i in range(MaxSteps):
-        if (not bKeepRunning):
+        if not bKeepRunning:
             break
         # A, B = linearize_dynamics(state, reference_control, t=t)
         A, B = linearize_dynamics_numerically(state, reference_control, h=h_in, true_dynamics=car.true_dynamics)
@@ -231,7 +245,7 @@ def run_problem(probname, start_state, goal_state,
         car.visualize_state(state)
 
         # if control is close to 0, end
-        if (np.linalg.norm(control) < tol):
+        if np.linalg.norm(control) < tol:
             break
 
     bKeepRunning = False
@@ -246,8 +260,10 @@ def run_problem(probname, start_state, goal_state,
 
 if __name__ == "__main__":
 
+    print("Script started")
+
     args = sys.argv[1:]
-    if (len(args) == 0):
+    if len(args) == 0:
         print("Specify what to run:")
         print("  'python3 carqp.py test_linearization' will test the numerical linearization method")
         print("  'python3 carqp.py run_test [test index]' will run the simulation for a specific test index (0-2)")

@@ -33,7 +33,7 @@ if __name__ == "__main__":
     beta = 0.6  # for back-tracking line search
 
     # these are defined as [a b]
-    hyperplanes = np.asmatrix([
+    hyperplanes = np.mat([
         [0.7071, 0.7071, 1.5],
         [-0.7071, 0.7071, 1.5],
         [0.7071, -0.7071, 1],
@@ -44,10 +44,10 @@ if __name__ == "__main__":
     numplanes = hyperplanes.shape[0]
 
     # the optimization function c:
-    c = np.asmatrix([2, 1]).T
+    c = np.mat([2, 1]).T
 
     # pick a starting point (this can be done autonomously, but we'll do it by hand)
-    x = np.asmatrix([0, 0]).T
+    x = np.mat([0, 0]).T
 
     # now draw the constraining hyperplanes
     DrawHyperplanes(hyperplanes)
