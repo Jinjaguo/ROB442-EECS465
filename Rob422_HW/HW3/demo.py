@@ -8,7 +8,7 @@ def main(screenshot=False):
     # initialize PyBullet
     connect(use_gui=True)
     # load robot and obstacle resources
-    robots, obstacles = load_env('pr2table.json')
+    robots, obstacles = load_env(r'/home/rob422/ROB442-EECS465/Rob422_HW/HW3/pr2doorway.json')
     # get the index for PR2
     PR2 = robots['pr2']
 
