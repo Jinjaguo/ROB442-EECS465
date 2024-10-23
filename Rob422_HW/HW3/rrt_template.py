@@ -5,11 +5,8 @@ from pybullet_tools.utils import connect, disconnect, wait_if_gui, joint_from_na
 import random
 ### YOUR IMPORTS HERE ###
 import time
-import pybullet
 from utils import draw_sphere_marker
-import imageio
 
-random.seed(1)
 STEP_SIZE = 0.05
 GOAL_BIAS = 0.1
 MAX_ITER = 150
