@@ -177,7 +177,7 @@ def main(screenshot=False):
             path = rrt.reconstruct_path()
             print("Planner run time: ", time.time() - start_time)
             break
-        if ((time.time() - start_time) > 600):
+        if (time.time() - start_time) > 600:
             print("No Solution Found.")
             break
 

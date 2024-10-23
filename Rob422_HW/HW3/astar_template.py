@@ -6,6 +6,7 @@ from pybullet_tools.pr2_utils import PR2_GROUPS
 import time
 ### YOUR IMPORTS HERE ###
 from queue import PriorityQueue
+import pybullet as p
 
 
 #########################
@@ -15,6 +16,13 @@ def wrap_to_pi(angle: float) -> float:
     while angle > np.pi:
         angle -= 2 * np.pi
     return angle
+
+
+def draw_spheres_in_batch(spheres_data):
+    for data in spheres_data:
+        position, radius, color = data
+        vs_id = p.createVisualShape(p.GEOM_SPHERE, radius=radius, rgbaColor=color)
+        p.createMultiBody(basePosition=position, baseCollisionShapeIndex=-1, baseVisualShapeIndex=vs_id)
 
 
 def get_neighbors(node, mode=8):
@@ -123,12 +131,21 @@ def main(screenshot=False):
         print("Path cost: ", g_cost)
 
     if draw_graph:
+        spheres_to_draw = []
+
         for collision in collision_list:
-            draw_sphere_marker((collision[0], collision[1], 1.0), 0.05, (1, 0, 0, 1))
+            spheres_to_draw.append(((collision[0], collision[1], 1.0), 0.05, (1, 0, 0, 1)))  # Red
+
+            # Prepare collision-free points in blue
         for collision_free in collision_free_list:
-            draw_sphere_marker((collision_free[0], collision_free[1], 1.0), 0.05, (0, 0, 1, 1))
+            spheres_to_draw.append(((collision_free[0], collision_free[1], 1.0), 0.05, (0, 0, 1, 1)))  # Blue
+
+            # Prepare path points in black
         for p in path:
-            draw_sphere_marker((p[0], p[1], 1.1), 0.05, (0, 0, 0, 1))
+            spheres_to_draw.append(((p[0], p[1], 1.1), 0.05, (0, 0, 0, 1)))  # Black
+
+            # Step 5: Batch draw all spheres at once
+        draw_spheres_in_batch(spheres_to_draw)
     ######################
     print("Planner run time: ", time.time() - start_time)
     # Execute planned path
