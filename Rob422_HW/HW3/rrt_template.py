@@ -5,9 +5,17 @@ from pybullet_tools.utils import connect, disconnect, wait_if_gui, joint_from_na
 import random
 ### YOUR IMPORTS HERE ###
 import time
+import pybullet
 from utils import draw_sphere_marker
+import imageio
 
-random.seed(0)
+random.seed(1)
+STEP_SIZE = 0.05
+GOAL_BIAS = 0.1
+MAX_ITER = 150
+DIST_THRESHOLD = 1e-4
+
+
 class Node:
     def __init__(self, config, parent=None):
         self.config = np.array(config)
@@ -15,7 +23,7 @@ class Node:
 
 
 class RRT:
-    def __init__(self, start_node, goal_node, collision_fn, joint_limits, step_size=0.05, goal_bias=0.1, max_iter=150):
+    def __init__(self, start_node, goal_node, collision_fn, joint_limits, step_size=STEP_SIZE, goal_bias=GOAL_BIAS, max_iter=MAX_ITER):
         self.start_node = start_node
         self.goal_node = goal_node
         self.collision = collision_fn
@@ -71,7 +79,7 @@ class RRT:
 
             new_node.parent = prev_node
             self.node_list.append(new_node)
-            if np.linalg.norm(new_node.config - sample_node.config) < 1e-4:
+            if np.linalg.norm(new_node.config - sample_node.config) < DIST_THRESHOLD:
                 break
 
             prev_node = new_node
@@ -112,17 +120,17 @@ class RRT:
 
         return smooth_path
 
-    def reconstruct_smooth_path(self, smooth_path):
+    def reconstruct_path_config(self, path):
         path = []
-        current_node = smooth_path[-1]
+        current_node = path[-1]
         while current_node.parent is not None:
             path.append(current_node.config)
             current_node = current_node.parent
-        path.append(smooth_path[0].config)
+        path.append(path[0].config)
 
         return path[::-1]
 
-    def reconstruct_path(self):
+    def reconstruct_path_node(self):
         path = []
         current_node = self.node_list[-1]
         while current_node.parent is not None:
@@ -173,7 +181,7 @@ def main(screenshot=False):
     while True:
         rrt.connect()
         if np.linalg.norm(rrt.node_list[-1].config - goal_node.config) < 1e-4:
-            path = rrt.reconstruct_path()
+            path = rrt.reconstruct_path_node()
             print("Planner run time: ", time.time() - start_time)
             break
         if (time.time() - start_time) > 600:
@@ -187,16 +195,25 @@ def main(screenshot=False):
             ee_pose = get_link_pose(PR2, link_from_name(PR2, 'l_gripper_tool_frame'))
             draw_sphere_marker((ee_pose[0][0], ee_pose[0][1], ee_pose[0][2]), 0.02, (1, 0, 0, 1))
 
+
         smooth_path = rrt.shortcut_smoothing(path)
         for sp in smooth_path:
             set_joint_positions(PR2, joint_idx, sp.config)
             ee_pose = get_link_pose(PR2, link_from_name(PR2, 'l_gripper_tool_frame'))
             draw_sphere_marker((ee_pose[0][0], ee_pose[0][1], ee_pose[0][2]), 0.02, (0, 0, 1, 1))
-        path = rrt.reconstruct_smooth_path(smooth_path)
+
 
     ######################
     # Execute planned path
-    execute_trajectory(robots['pr2'], joint_idx, path, sleep=0.1)
+    reconstruct_path = rrt.reconstruct_path_config(path)
+    execute_trajectory(robots['pr2'], joint_idx, reconstruct_path, sleep=0.1)
+
+    reconstruct_smooth_path = rrt.reconstruct_path_config(smooth_path)
+    execute_trajectory(robots['pr2'], joint_idx, reconstruct_smooth_path, sleep=0.1)
+
+
+
+
     # Keep graphics window opened
     wait_if_gui()
     disconnect()

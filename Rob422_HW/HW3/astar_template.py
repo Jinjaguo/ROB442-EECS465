@@ -21,7 +21,7 @@ def draw_spheres_in_batch(spheres_data):
         p.createMultiBody(basePosition=position, baseCollisionShapeIndex=-1, baseVisualShapeIndex=vs_id)
 
 
-def get_neighbors(node, mode=8):
+def get_neighbors(node, mode=4):
     dx, dy, dtheta = 0.1, 0.1, np.pi / 2
     if mode == 4:
         moves = [(dx, 0, 0), (0, dy, 0), (-dx, 0, 0), (0, -dy, 0), (0, 0, dtheta), (0, 0, -dtheta)]
@@ -115,10 +115,6 @@ def main(screenshot=False):
     start_time = time.time()
     ### YOUR CODE HERE ###
     draw_graph = True
-    # draw_graph = False
-    g_cost = 0.0
-    collision_list = set()
-    collision_free_list = set()
     g_cost, collision_list, collision_free_list, path = a_star(start_config, goal_config, collision_fn)
 
     if not path:
@@ -126,26 +122,25 @@ def main(screenshot=False):
     if path:
         print("Path cost: ", g_cost)
 
-    if draw_graph:
-        spheres_to_draw = []
-
-        for collision in collision_list:
-            spheres_to_draw.append(((collision[0], collision[1], 1.0), 0.05, (1, 0, 0, 1)))  # Red
-
-            # Prepare collision-free points in blue
-        for collision_free in collision_free_list:
-            spheres_to_draw.append(((collision_free[0], collision_free[1], 1.0), 0.05, (0, 0, 1, 1)))  # Blue
-
-            # Prepare path points in black
-        for p in path:
-            spheres_to_draw.append(((p[0], p[1], 1.1), 0.05, (0, 0, 0, 1)))  # Black
-
-            # Step 5: Batch draw all spheres at once
-        draw_spheres_in_batch(spheres_to_draw)
-    ######################
     print("Planner run time: ", time.time() - start_time)
     # Execute planned path
     execute_trajectory(robots['pr2'], base_joints, path, sleep=0.2)
+
+    if draw_graph:
+        spheres_to_draw = []
+
+        #for collision in collision_list:
+            #spheres_to_draw.append(((collision[0], collision[1], 1.0), 0.05, (1, 0, 0, 1)))
+
+        #for collision_free in collision_free_list:
+            #spheres_to_draw.append(((collision_free[0], collision_free[1], 1.0), 0.05, (0, 0, 1, 1)))
+
+        for p in path:
+            spheres_to_draw.append(((p[0], p[1], 1.1), 0.05, (0, 0, 0, 1)))
+
+            # Step 5: Batch draw all spheres at once
+        draw_spheres_in_batch(spheres_to_draw)
+
     # Keep graphics window opened
     wait_if_gui()
     disconnect()
