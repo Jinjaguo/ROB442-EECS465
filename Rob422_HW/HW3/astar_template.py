@@ -1,11 +1,90 @@
 import numpy as np
 from utils import get_collision_fn_PR2, load_env, execute_trajectory, draw_sphere_marker
-from pybullet_tools.utils import connect, disconnect, get_joint_positions, wait_if_gui, set_joint_positions, joint_from_name, get_link_pose, link_from_name
+from pybullet_tools.utils import connect, disconnect, get_joint_positions, wait_if_gui, set_joint_positions, \
+    joint_from_name, get_link_pose, link_from_name
 from pybullet_tools.pr2_utils import PR2_GROUPS
 import time
 ### YOUR IMPORTS HERE ###
+from queue import PriorityQueue
+
 
 #########################
+def wrap_to_pi(angle: float) -> float:
+    while angle < -np.pi:
+        angle += 2 * np.pi
+    while angle > np.pi:
+        angle -= 2 * np.pi
+    return angle
+
+
+def get_neighbors(node, mode=8):
+    dx, dy, dtheta = 0.1, 0.1, np.pi / 2
+    if mode == 4:
+        moves = [(dx, 0, 0), (0, dy, 0), (-dx, 0, 0), (0, -dy, 0), (0, 0, dtheta), (0, 0, -dtheta)]
+    if mode == 8:
+        moves = [(dx, 0, 0), (dx, 0, dtheta), (dx, 0, -dtheta), (0, dy, 0), (0, dy, dtheta), (0, dy, -dtheta),
+                 (-dx, 0, 0), (-dx, 0, dtheta), (-dx, 0, -dtheta), (0, -dy, 0), (0, -dy, dtheta), (0, -dy, -dtheta),
+                 (0, 0, dtheta), (0, 0, -dtheta), (dx, dy, 0), (dx, dy, dtheta), (dx, dy, -dtheta),
+                 (-dx, dy, 0), (-dx, dy, dtheta), (-dx, dy, -dtheta), (dx, -dy, 0), (dx, -dy, dtheta),
+                 (dx, -dy, -dtheta),
+                 (-dx, -dy, 0), (-dx, -dy, dtheta), (-dx, -dy, -dtheta)]  # diagonal actions
+    return [(node[0] + move[0], node[1] + move[1], wrap_to_pi(node[2] + move[2])) for move in moves]
+
+
+def cost(node, goal):
+    dtheta = abs(wrap_to_pi(node[2] - goal[2]))
+    return np.sqrt((node[0] - goal[0]) ** 2 + (node[1] - goal[1]) ** 2 + min(dtheta, 2 * np.pi - dtheta) ** 2)
+
+
+def reconstruct_path(close_list, current_node):
+    path = []
+    while current_node is not None:
+        path.append(current_node)
+        current_node = close_list.get(current_node)
+    return path[::-1]
+
+
+def a_star(start, goal, collision_fn):
+    open_list = PriorityQueue()
+    open_list.put((0, start))
+    gcosts = {start: 0}
+    fcosts = {start: cost(start, goal)}
+    search_list = {}
+    close_list = set()
+    collision_list = set()
+    collision_free_list = set()
+
+    while not open_list.empty():
+        _, current_node = open_list.get()
+
+        if current_node in close_list:
+            continue
+
+        if collision_fn(current_node):
+            collision_list.add(current_node)
+            continue
+
+        close_list.add(current_node)
+        collision_free_list.add(current_node)
+
+        if abs(current_node[0] - goal[0]) < 1e-4 and abs(current_node[1] - goal[1]) < 1e-4 and abs(
+                wrap_to_pi(current_node[2] - goal[2])) < 1e-4:
+            return gcosts[current_node], collision_list, collision_free_list, reconstruct_path(search_list,
+                                                                                               current_node)
+
+        for neighbor in get_neighbors(current_node):
+            proposed_gcost = gcosts[current_node] + cost(current_node, neighbor)
+
+            if neighbor in close_list or (neighbor in gcosts and proposed_gcost >= gcosts[neighbor]):
+                continue
+
+            search_list[neighbor] = current_node
+            gcosts[neighbor] = proposed_gcost
+            fcosts[neighbor] = proposed_gcost + cost(neighbor, goal)
+            open_list.put((fcosts[neighbor], neighbor))
+
+    return gcosts[current_node], collision_list, collision_free_list, None
+
 
 def main(screenshot=False):
     # initialize PyBullet
@@ -25,14 +104,31 @@ def main(screenshot=False):
 
     # Example of draw 
     # draw_sphere_marker((0, 0, 1), 0.1, (1, 0, 0, 1))
-    
+
     start_config = tuple(get_joint_positions(robots['pr2'], base_joints))
-    goal_config = (2.6, -1.3, -np.pi/2)
+    goal_config = (2.6, -1.3, -np.pi / 2)
     path = []
     start_time = time.time()
     ### YOUR CODE HERE ###
-    
-    
+    draw_graph = True
+    # draw_graph = False
+    g_cost = 0.0
+    collision_list = set()
+    collision_free_list = set()
+    g_cost, collision_list, collision_free_list, path = a_star(start_config, goal_config, collision_fn)
+
+    if not path:
+        print("No Solution Found.")
+    if path:
+        print("Path cost: ", g_cost)
+
+    if draw_graph:
+        for collision in collision_list:
+            draw_sphere_marker((collision[0], collision[1], 1.0), 0.05, (1, 0, 0, 1))
+        for collision_free in collision_free_list:
+            draw_sphere_marker((collision_free[0], collision_free[1], 1.0), 0.05, (0, 0, 1, 1))
+        for p in path:
+            draw_sphere_marker((p[0], p[1], 1.1), 0.05, (0, 0, 0, 1))
     ######################
     print("Planner run time: ", time.time() - start_time)
     # Execute planned path
@@ -40,6 +136,7 @@ def main(screenshot=False):
     # Keep graphics window opened
     wait_if_gui()
     disconnect()
+
 
 if __name__ == '__main__':
     main()
