@@ -23,7 +23,8 @@ class Node:
 
 
 class RRT:
-    def __init__(self, start_node, goal_node, collision_fn, joint_limits, step_size=STEP_SIZE, goal_bias=GOAL_BIAS, max_iter=MAX_ITER):
+    def __init__(self, start_node, goal_node, collision_fn, joint_limits, step_size=STEP_SIZE, goal_bias=GOAL_BIAS,
+                 max_iter=MAX_ITER):
         self.start_node = start_node
         self.goal_node = goal_node
         self.collision = collision_fn
@@ -120,13 +121,13 @@ class RRT:
 
         return smooth_path
 
-    def reconstruct_path_config(self, path):
+    def reconstruct_path_config(self, smooth_path):
         path = []
-        current_node = path[-1]
+        current_node = smooth_path[-1]
         while current_node.parent is not None:
             path.append(current_node.config)
             current_node = current_node.parent
-        path.append(path[0].config)
+        path.append(smooth_path[0].config)
 
         return path[::-1]
 
@@ -195,13 +196,11 @@ def main(screenshot=False):
             ee_pose = get_link_pose(PR2, link_from_name(PR2, 'l_gripper_tool_frame'))
             draw_sphere_marker((ee_pose[0][0], ee_pose[0][1], ee_pose[0][2]), 0.02, (1, 0, 0, 1))
 
-
         smooth_path = rrt.shortcut_smoothing(path)
         for sp in smooth_path:
             set_joint_positions(PR2, joint_idx, sp.config)
             ee_pose = get_link_pose(PR2, link_from_name(PR2, 'l_gripper_tool_frame'))
             draw_sphere_marker((ee_pose[0][0], ee_pose[0][1], ee_pose[0][2]), 0.02, (0, 0, 1, 1))
-
 
     ######################
     # Execute planned path
@@ -210,9 +209,6 @@ def main(screenshot=False):
 
     reconstruct_smooth_path = rrt.reconstruct_path_config(smooth_path)
     execute_trajectory(robots['pr2'], joint_idx, reconstruct_smooth_path, sleep=0.1)
-
-
-
 
     # Keep graphics window opened
     wait_if_gui()
