@@ -35,21 +35,13 @@ class RRT:
 
     def nearest(self, node_list, node):
         dist = []
-        # weights = np.array([0.035, 0.6, 0.15, 0.15, 0.03, 0.035])
-        weights = np.array([1, 1, 1, 1, 1, 1])
         for nodes in node_list:
             diff = nodes.config - node.config
-            # for d in range(diff.shape[0]):
-            #     diff[d] = min(abs(diff[d]), 2*np.pi-abs(diff[d]))
             diff[4] = min(abs(diff[4]), 2 * np.pi - abs(diff[4]))
-            dist.append(np.linalg.norm(diff @ weights))
-            # dist.append(np.linalg.norm(diff))
+            dist.append(np.linalg.norm(diff))
         return node_list[np.argmin(dist)]
 
     def extend(self, nearest_node, sample_node):
-        if np.linalg.norm(nearest_node.config - sample_node.config) < self.step_size:
-            return sample_node
-
         direction = sample_node.config - nearest_node.config
         direction /= np.linalg.norm(direction)
 
@@ -103,12 +95,7 @@ class RRT:
             if not access:
                 continue
 
-            smooth_path = []
-            smooth_path = path[:points[0] + 1]
-            smooth_path += new_node_list
-            if points[1] + 1 < len(path):
-                path[points[1] + 1].parent = smooth_path[-1]
-                smooth_path += path[points[1] + 1:]
+            smooth_path = path[:points[0] + 1] + new_node_list + path[points[1] + 1:]
             path = smooth_path
 
         return smooth_path
@@ -198,7 +185,6 @@ def main(screenshot=False):
     ######################
     # Execute planned path
     execute_trajectory(robots['pr2'], joint_idx, path, sleep=0.1)
-    # Keep graphics window opened
     wait_if_gui()
     disconnect()
 

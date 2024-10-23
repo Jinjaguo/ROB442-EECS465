@@ -11,11 +11,7 @@ import pybullet as p
 
 #########################
 def wrap_to_pi(angle: float) -> float:
-    while angle < -np.pi:
-        angle += 2 * np.pi
-    while angle > np.pi:
-        angle -= 2 * np.pi
-    return angle
+    return (angle + np.pi) % (2 * np.pi) - np.pi
 
 
 def draw_spheres_in_batch(spheres_data):
@@ -75,8 +71,8 @@ def a_star(start, goal, collision_fn):
         close_list.add(current_node)
         collision_free_list.add(current_node)
 
-        if abs(current_node[0] - goal[0]) < 1e-4 and abs(current_node[1] - goal[1]) < 1e-4 and abs(
-                wrap_to_pi(current_node[2] - goal[2])) < 1e-4:
+        if np.allclose(current_node[:2], goal[:2], atol=1e-4) and np.allclose(wrap_to_pi(current_node[2]),
+                                                                              wrap_to_pi(goal[2]), atol=1e-4):
             return gcosts[current_node], collision_list, collision_free_list, reconstruct_path(search_list,
                                                                                                current_node)
 
