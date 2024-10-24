@@ -11,6 +11,7 @@ STEP_SIZE = 0.05
 GOAL_BIAS = 0.1
 MAX_ITER = 150
 DIST_THRESHOLD = 1e-4
+np.random.seed(422)
 
 
 class Node:

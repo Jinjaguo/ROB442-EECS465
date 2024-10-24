@@ -21,17 +21,17 @@ def draw_spheres_in_batch(spheres_data):
         p.createMultiBody(basePosition=position, baseCollisionShapeIndex=-1, baseVisualShapeIndex=vs_id)
 
 
-def get_neighbors(node, mode=8):
+def get_neighbors(node, mode=4):
     dx, dy, dtheta = 0.1, 0.1, np.pi / 2
-    moves = []
     if mode == 4:
-        moves = [(dx, 0, 0), (0, dy, 0), (-dx, 0, 0), (0, -dy, 0)]
+        moves = [(dx, 0, 0), (0, dy, 0), (-dx, 0, 0), (0, -dy, 0), (0, 0, dtheta), (0, 0, -dtheta)]
     if mode == 8:
         moves = [(dx, 0, 0), (dx, 0, dtheta), (dx, 0, -dtheta), (0, dy, 0), (0, dy, dtheta), (0, dy, -dtheta),
                  (-dx, 0, 0), (-dx, 0, dtheta), (-dx, 0, -dtheta), (0, -dy, 0), (0, -dy, dtheta), (0, -dy, -dtheta),
                  (0, 0, dtheta), (0, 0, -dtheta), (dx, dy, 0), (dx, dy, dtheta), (dx, dy, -dtheta),
                  (-dx, dy, 0), (-dx, dy, dtheta), (-dx, dy, -dtheta), (dx, -dy, 0), (dx, -dy, dtheta),
-                 (dx, -dy, -dtheta), (-dx, -dy, 0), (-dx, -dy, dtheta), (-dx, -dy, -dtheta)]  # diagonal actions
+                 (dx, -dy, -dtheta),
+                 (-dx, -dy, 0), (-dx, -dy, dtheta), (-dx, -dy, -dtheta)]  # diagonal actions
     return [(node[0] + move[0], node[1] + move[1], wrap_to_pi(node[2] + move[2])) for move in moves]
 
 
@@ -40,11 +40,11 @@ def cost(node, goal):
     return np.sqrt((node[0] - goal[0]) ** 2 + (node[1] - goal[1]) ** 2 + min(dtheta, 2 * np.pi - dtheta) ** 2)
 
 
-def reconstruct_path(search_list, current_node):
+def reconstruct_path(close_list, current_node):
     path = []
     while current_node is not None:
         path.append(current_node)
-        current_node = search_list.get(current_node)
+        current_node = close_list.get(current_node)
     return path[::-1]
 
 
@@ -106,7 +106,7 @@ def main(screenshot=False):
     # Example use of setting body poses
     # set_pose(obstacles['ikeatable6'], ((0, 0, 0), (1, 0, 0, 0)))
 
-    # Example of draw 
+    # Example of draw
     # draw_sphere_marker((0, 0, 1), 0.1, (1, 0, 0, 1))
 
     start_config = tuple(get_joint_positions(robots['pr2'], base_joints))
@@ -128,10 +128,12 @@ def main(screenshot=False):
 
     if draw_graph:
         spheres_to_draw = []
-        for collision in collision_list:
-            spheres_to_draw.append(((collision[0], collision[1], 1.0), 0.05, (1, 0, 0, 1)))
-        for collision_free in collision_free_list:
-            spheres_to_draw.append(((collision_free[0], collision_free[1], 1.0), 0.05, (0, 0, 1, 1)))
+
+        #for collision in collision_list:
+            #spheres_to_draw.append(((collision[0], collision[1], 1.0), 0.05, (1, 0, 0, 1)))
+
+        #for collision_free in collision_free_list:
+            #spheres_to_draw.append(((collision_free[0], collision_free[1], 1.0), 0.05, (0, 0, 1, 1)))
 
         for p in path:
             spheres_to_draw.append(((p[0], p[1], 1.1), 0.05, (0, 0, 0, 1)))
