@@ -21,7 +21,7 @@ def draw_spheres_in_batch(spheres_data):
         p.createMultiBody(basePosition=position, baseCollisionShapeIndex=-1, baseVisualShapeIndex=vs_id)
 
 
-def get_neighbors(node, mode=4):
+def get_neighbors(node, mode=8):
     dx, dy, dtheta = 0.1, 0.1, np.pi / 2
     if mode == 4:
         moves = [(dx, 0, 0), (0, dy, 0), (-dx, 0, 0), (0, -dy, 0), (0, 0, dtheta), (0, 0, -dtheta)]
