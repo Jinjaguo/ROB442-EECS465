@@ -1,4 +1,6 @@
 import numpy as np
+from numpy.ma.core import array
+
 from pybullet_tools.utils import connect, disconnect, set_joint_positions, wait_if_gui, set_point, load_model, \
     joint_from_name, link_from_name, get_joint_info, HideOutput, get_com_pose, wait_for_duration
 from pybullet_tools.transformations import quaternion_matrix
@@ -139,9 +141,15 @@ def main():
     except:
         print("ERROR: Test index has not been specified")
         exit()
+    connect(use_gui=True, shadows=False)
+
+    # load robot
+    with HideOutput():
+        robot = load_model(DRAKE_PR2_URDF, fixed_base=True)
+        set_point(robot, (-0.75, -0.07551, 0.02))
+    tuck_arm(robot)
 
     # initialize PyBullet
-    connect(use_gui=True, shadows=False)
     camera_distance = 3  # 摄像机与目标的距离
     camera_yaw = 50  # 摄像机的偏航角
     camera_pitch = -35  # 摄像机的俯仰角
@@ -150,12 +158,6 @@ def main():
 
     # 保存每一帧的图像列表
     frames = []
-
-    # load robot
-    with HideOutput():
-        robot = load_model(DRAKE_PR2_URDF, fixed_base=True)
-        set_point(robot, (-0.75, -0.07551, 0.02))
-    tuck_arm(robot)
 
     # define active DoFs
     joint_names = ['l_shoulder_pan_joint', 'l_shoulder_lift_joint', 'l_upper_arm_roll_joint',
@@ -188,13 +190,8 @@ def main():
     joint_limit[-1] = [-np.pi, np.pi]
 
     for _ in range(max_iters):
-        # 更新机器人关节位置
         set_joint_positions_np(robot, joint_idx, q)
-
-        # 确保场景更新
         p.stepSimulation()
-
-        # 获取当前末端执行器位置
         current = get_ee_transform(robot, joint_idx)[:3, 3]
         draw_sphere_marker(current, 0.05, (0, 0, 1, 1))
 
@@ -214,7 +211,7 @@ def main():
             lower, upper = joint_limit[i]
             q[0, i] = np.clip(q[0, i] + delta, lower, upper)
 
-        # 获取图像前进行渲染更新
+        # 每次迭代时获取当前视角的图像，并保存为帧
         width, height, rgb_img, _, _ = p.getCameraImage(
             width=320,
             height=240,
@@ -235,7 +232,10 @@ def main():
         )
 
         # 转换为 PIL 格式并添加到帧列表中
-        img = Image.fromarray(rgb_img)
+        rgb_array = np.array(rgb_img)
+        rgb_array_rgb = rgb_array[:,:,:3]
+        img = Image.fromarray(rgb_array_rgb,"RGB")
+        img.save("1.png")
         frames.append(img)
 
         time.sleep(0.01)
