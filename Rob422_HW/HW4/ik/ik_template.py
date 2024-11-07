@@ -142,34 +142,14 @@ def main():
 
     # initialize PyBullet
     connect(use_gui=True, shadows=False)
-    # 设置摄像机视角参数
-    camera_distance = 1.5  # 距离目标点的距离
+    camera_distance = 3  # 摄像机与目标的距离
     camera_yaw = 50  # 摄像机的偏航角
     camera_pitch = -35  # 摄像机的俯仰角
-    camera_target_position = [-0.75, -0.07551, 0.02]  # 摄像机目标位置
-
-    # 使用 resetDebugVisualizerCamera 设置 GUI 中的摄像机视角
+    camera_target_position = [-0.75, -0.07551, 0.42]  # 摄像机目标位置
     p.resetDebugVisualizerCamera(camera_distance, camera_yaw, camera_pitch, camera_target_position)
 
-    # 设置 getCameraImage 的视角参数，使其与 resetDebugVisualizerCamera 一致
-    width, height, rgb_img, _, _ = p.getCameraImage(
-        width=320,
-        height=240,
-        viewMatrix=p.computeViewMatrixFromYawPitchRoll(
-            cameraTargetPosition=camera_target_position,
-            distance=camera_distance,
-            yaw=camera_yaw,
-            pitch=camera_pitch,
-            roll=0,
-            upAxisIndex=2
-        ),
-        projectionMatrix=p.computeProjectionMatrixFOV(
-            fov=60,  # 视角
-            aspect=1.0,  # 宽高比
-            nearVal=0.1,  # 近剪裁平面
-            farVal=100.0  # 远剪裁平面
-        )
-    )
+    # 保存每一帧的图像列表
+    frames = []
 
     # load robot
     with HideOutput():
@@ -181,10 +161,9 @@ def main():
     joint_names = ['l_shoulder_pan_joint', 'l_shoulder_lift_joint', 'l_upper_arm_roll_joint',
                    'l_elbow_flex_joint', 'l_forearm_roll_joint', 'l_wrist_flex_joint', 'l_wrist_roll_joint']
     joint_idx = [joint_from_name(robot, jn) for jn in joint_names]
-    # intial config
     q_arr = np.zeros((1, len(joint_idx)))
     set_joint_positions_np(robot, joint_idx, q_arr)
-    # list of example targets
+
     targets = [[-0.15070158, 0.47726995, 1.56714123],
                [-0.36535318, 0.11249, 1.08326675],
                [-0.56491217, 0.011443, 1.2922572],
@@ -193,17 +172,17 @@ def main():
 
     for target in targets:
         draw_sphere_marker(target, 0.05, (1, 0, 0, 1))
-    # define joint limits
+
     joint_limits = {joint_names[i]: (
         get_joint_info(robot, joint_idx[i]).jointLowerLimit, get_joint_info(robot, joint_idx[i]).jointUpperLimit) for i
         in
         range(len(joint_idx))}
-    q = np.zeros((1, len(joint_names)))  # start at this configuration
+    q = np.zeros((1, len(joint_names)))
     target = targets[test_idx]
 
-    max_iters = 100  # 最大迭代次数
-    threshold = 0.01  # 误差阈值
-    alpha = 0.1  # 学习率/步长因子
+    max_iters = 100
+    threshold = 0.01
+    alpha = 0.1
     joint_limit = np.array([[value[0], value[1]] for value in joint_limits.values()])
     joint_limit[4] = [-np.pi, np.pi]
     joint_limit[-1] = [-np.pi, np.pi]
@@ -215,12 +194,10 @@ def main():
 
         error = target - current
         if np.linalg.norm(error) < threshold:
-            np.set_printoptions(precision=5, suppress=True)
             print("The configuration is: ", q)
             break
 
         J = get_translation_jacobian(robot, joint_idx)
-        # J = get_full_jacobian(robot, joint_idx)
         J_pinv = get_jacobian_pinv(J)
         delta_q = J_pinv @ error
 
@@ -231,10 +208,32 @@ def main():
             lower, upper = joint_limit[i]
             q[0, i] = np.clip(q[0, i] + delta, lower, upper)
 
-            img = Image.fromarray(rgb_img)
-            frames.append(img)
-            # 重新渲染场景
-            time.sleep(0.01)
+        # 每次迭代时获取当前视角的图像，并保存为帧
+        width, height, rgb_img, _, _ = p.getCameraImage(
+            width=320,
+            height=240,
+            viewMatrix=p.computeViewMatrixFromYawPitchRoll(
+                cameraTargetPosition=camera_target_position,
+                distance=camera_distance,
+                yaw=camera_yaw,
+                pitch=camera_pitch,
+                roll=0,
+                upAxisIndex=2
+            ),
+            projectionMatrix=p.computeProjectionMatrixFOV(
+                fov=60,
+                aspect=1.0,
+                nearVal=0.1,
+                farVal=100.0
+            )
+        )
+
+        # 转换为 PIL 格式并添加到帧列表中
+        img = Image.fromarray(rgb_img)
+        frames.append(img)
+
+        time.sleep(0.01)
+
     save_gif(frames, filename="simulation.gif", duration=100)
     print('The configuration of robot is', q)
 
