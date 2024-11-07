@@ -188,8 +188,13 @@ def main():
     joint_limit[-1] = [-np.pi, np.pi]
 
     for _ in range(max_iters):
+        # 更新机器人关节位置
         set_joint_positions_np(robot, joint_idx, q)
+
+        # 确保场景更新
         p.stepSimulation()
+
+        # 获取当前末端执行器位置
         current = get_ee_transform(robot, joint_idx)[:3, 3]
         draw_sphere_marker(current, 0.05, (0, 0, 1, 1))
 
@@ -209,7 +214,7 @@ def main():
             lower, upper = joint_limit[i]
             q[0, i] = np.clip(q[0, i] + delta, lower, upper)
 
-        # 每次迭代时获取当前视角的图像，并保存为帧
+        # 获取图像前进行渲染更新
         width, height, rgb_img, _, _ = p.getCameraImage(
             width=320,
             height=240,
