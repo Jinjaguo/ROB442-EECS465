@@ -5,28 +5,30 @@ import time
 import random
 import matplotlib.pyplot as plt
 ###YOUR IMPORTS HERE###
+###YOUR IMPORTS HERE###
 from ransac_template import RANSAC, calculate_error
+import numpy as np
+
 ###YOUR IMPORTS HERE###
 
-def add_some_outliers(pc,num_outliers):
+def add_some_outliers(pc, num_outliers):
     pc = utils.add_outliers_centroid(pc, num_outliers, 0.75, 'uniform')
     random.shuffle(pc)
     return pc
 
+
 def main():
-    #Import the cloud
+    # Import the cloud
     pc = utils.load_pc('cloud_pca.csv')
 
     num_tests = 10
-    fig = None
     pca_error = []
     ransac_error = []
     number_outliers = []
     pca_time = []
     ransac_time = []
-    for i in range(0,num_tests):
-        pc = add_some_outliers(pc,10) #adding 10 new outliers for each test
-        fig = utils.view_pc([pc])
+    for i in range(0, num_tests):
+        pc = add_some_outliers(pc, 10)  # adding 10 new outliers for each test
 
         ###YOUR CODE HERE###
         pc = numpy.array(pc).squeeze()
@@ -38,7 +40,7 @@ def main():
         pca_centered = pc - pca_mean
         Q = numpy.cov(pca_centered, rowvar=False)
         _, _, Vt = numpy.linalg.svd(Q)
-        normal_pca = Vt[-1]
+        normal_pca = Vt[-1]  # 取出法向量
 
         threshold = 1e-2
         pca_inliers = pc[calculate_error(pc, normal_pca, pca_mean, keep_elem=True) < threshold]
@@ -49,63 +51,78 @@ def main():
 
         # RANSAC
         ransac_start = time.time()
-        (normal_ransac, ransac_mean), ransac_inliers, error = RANSAC(pc, iter=1500, threshold=1e-2, N=150)
+        (normal_ransac, ransac_mean), ransac_inliers, error = RANSAC(pc, iter=1500, threshold=1e-2, min_inliers=150)
         ransac_end = time.time()
         ransac_error.append(error)
         ransac_outliers = numpy.array([point for point in pc if point not in ransac_inliers])
         ransac_time.append(ransac_end - ransac_start)
 
+        # Convert the point cloud to matrices for plotting
+        ### IMPROTANT ###
         pc = [numpy.asmatrix(pcs.reshape(3, 1)) for pcs in pc]
+
         if i == (num_tests - 1):
             # Show the resulting point cloud for PCA
             fig_pca = plt.figure()
-            pca = fig_pca.add_subplot(111, projection='3d')
-            pca.scatter(pca_inliers[:, 0], pca_inliers[:, 1], pca_inliers[:, 2], color='r', s=30)
-            pca.scatter(pca_outliers[:, 0], pca_outliers[:, 1], pca_outliers[:, 2], color='b', s=30)
-            pca.set_title("PCA")
-            pca.set_xlabel('X')
-            pca.set_ylabel('Y')
-            pca.set_zlabel('Z')
-            fig_pca = utils.draw_plane(fig_pca, numpy.asmatrix(normal_pca.reshape(3, 1)),
-                                       numpy.asmatrix(pca_mean.reshape(3, 1)), (0.1, 0.7, 0.1, 0.5), width=[-0.5, 1])
+            plt.title("PCA Plane Fitting")
+            ax_pca = fig_pca.add_subplot(111, projection='3d')
+            ax_pca.scatter(pca_inliers[:, 0], pca_inliers[:, 1], pca_inliers[:, 2], color='r', s=30, label='Inliers')
+            ax_pca.scatter(pca_outliers[:, 0], pca_outliers[:, 1], pca_outliers[:, 2], color='b', s=30,
+                           label='Outliers')
+            utils.draw_plane(fig_pca, np.asmatrix(normal_pca.reshape(3, 1)), np.asmatrix(pca_mean.reshape(3, 1)),
+                             color=(0.1, 0.7, 0.1, 0.5), width=[-0.5, 1])
 
-            for angle in range(60, 120):
-                pca.view_init(20, angle)
-                plt.draw()
-                plt.pause(.001)
-                plt.savefig("{}.png".format(angle))
+            ax_pca.set_xlabel('X')
+            ax_pca.set_ylabel('Y')
+            ax_pca.set_zlabel('Z')
+            ax_pca.legend()
 
-            # Show the resulting point cloud for RANSAC
+            fig_pca.savefig('pca_plane_fitting.png')
+            plt.show()
+
+
+
+            # RANSAC 结果图
             fig_ransac = plt.figure()
-            ransac = fig_ransac.add_subplot(111, projection='3d')
-            ransac.scatter(ransac_inliers[:, 0], ransac_inliers[:, 1], ransac_inliers[:, 2], color='r', s=30)
-            ransac.scatter(ransac_outliers[:, 0], ransac_outliers[:, 1], ransac_outliers[:, 2], color='b', s=30)
-            ransac.set_title("RANSAC")
-            ransac.set_xlabel('X')
-            ransac.set_ylabel('Y')
-            ransac.set_zlabel('Z')
-            fig_ransac = utils.draw_plane(fig_ransac, numpy.asmatrix(normal_ransac.reshape(3, 1)),
-                                          numpy.asmatrix(ransac_mean.reshape(3, 1)), (0.1, 0.7, 0.1, 0.5),
-                                          width=[-0.5, 1])
+            plt.title("RANSAC Plane Fitting")
+            ax_ransac = fig_ransac.add_subplot(111, projection='3d')
+            ax_ransac.scatter(ransac_inliers[:, 0], ransac_inliers[:, 1], ransac_inliers[:, 2], color='r', s=30,
+                              label='Inliers')
+            ax_ransac.scatter(ransac_outliers[:, 0], ransac_outliers[:, 1], ransac_outliers[:, 2], color='b', s=30,
+                              label='Outliers')
+            utils.draw_plane(fig_ransac, np.asmatrix(normal_ransac.reshape(3, 1)),
+                             np.asmatrix(ransac_mean.reshape(3, 1)),
+                             color=(0.1, 0.7, 0.1, 0.5), width=[-0.5, 1])
+            ax_ransac.set_xlabel('X')
+            ax_ransac.set_ylabel('Y')
+            ax_ransac.set_zlabel('Z')
+            ax_ransac.legend()
+            fig_ransac.savefig('ransac_plane_fitting.png')
+            plt.show()
 
-            # Show the error vs outliers
+
+            # 误差对比图
             fig_error = plt.figure()
-            error = fig_error.add_subplot(111)
-            error.plot(number_outliers, pca_error, label="PCA error", linewidth=2)
-            error.plot(number_outliers, ransac_error, label="RANSAC error", linewidth=2)
-            error.set_xticks(number_outliers)
-            error.set_xlabel('Number of Outliers')
-            error.set_ylabel('Errors')
-            error.legend()
-            fig_error.show()
+            plt.plot(number_outliers, pca_error, label="PCA Error", linewidth=2, marker='o')
+            plt.plot(number_outliers, ransac_error, label="RANSAC Error", linewidth=2, marker='o')
+            plt.xlabel("Number of Outliers")
+            plt.ylabel("Error")
+            plt.title("Error vs. Number of Outliers")
+            plt.legend()
+            plt.grid()
 
-            numpy.set_printoptions(precision=5, suppress=True)
-            print("Computation times of PCA: ", pca_time)
-            print("Average computation times of PCA: ", numpy.mean(pca_time))
-            print("Computation times of RANSAC: ", ransac_time)
-            print("Average computation times of RANSAC: ", numpy.mean(ransac_time))
+            fig_error.savefig('pca_vs_ransac.png')
+            plt.show()
 
-            input("Press enter to close plots.")
+
+            # 显示计算时间
+            np.set_printoptions(precision=5, suppress=True)
+            print("PCA Computation Times: ", pca_time)
+            print("Average PCA Computation Time: ", np.mean(pca_time))
+            print("RANSAC Computation Times: ", ransac_time)
+            print("Average RANSAC Computation Time: ", np.mean(ransac_time))
+
+
 
         # this code is just for viewing, you can remove or change it
         # input("Press enter for next test:")

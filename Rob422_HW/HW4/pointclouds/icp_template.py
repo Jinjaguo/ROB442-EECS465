@@ -36,20 +36,10 @@ def compute_error(R, t, pc_source, pc_target):
     return error
 
 
-def main():
-    #Import the cloud
-    pc_source = utils.load_pc('cloud_icp_source.csv')
-
-    ###YOUR CODE HERE###
-    pc_target = utils.load_pc('cloud_icp_target0.csv') # Change this to load in a different target
+def icp(pc_source, pc_target, max_iterations=100, epsilon=1e-5):
     errors = []
-    epsilon = 1e-5
     iterations = []
-    max_iterations = 100
     pc_source_old = pc_source
-    pc_source = numpy.array(pc_source).squeeze()
-    pc_target = numpy.array(pc_target).squeeze()
-
     for iter in range(max_iterations):
         iterations.append(iter)
 
@@ -62,26 +52,57 @@ def main():
 
         pc_source = (R @ pc_source.T).T + t
 
+    return pc_source, errors, iterations
+
+
+def main():
+    # Import the cloud
+    pc_source = utils.load_pc('cloud_icp_source.csv')
+
+    ###YOUR CODE HERE###
+    target_files = 'cloud_icp_target3.csv'
+    pc_target = utils.load_pc(target_files)  # Change this to load in a different target
+    epsilon = 1e-5
+    max_iterations = 100
+    pc_source_old = pc_source
+    pc_source = numpy.array(pc_source).squeeze()
+    pc_target = numpy.array(pc_target).squeeze()
+
+    icp_result = icp(pc_source, pc_target, max_iterations, epsilon)
+    pc_source = icp_result[0]
+    errors = icp_result[1]
+    iterations = icp_result[2]
+
     pc_source = [numpy.asmatrix(pcs.reshape(3, 1)) for pcs in pc_source]
     pc_target = [numpy.asmatrix(pcs.reshape(3, 1)) for pcs in pc_target]
 
-    fig_error = plt.figure()
-    error = fig_error.add_subplot(111)
-    error.plot(iterations, errors, linewidth=2)
-    error.set_xlabel('Number of Iteration')
-    error.set_ylabel('Error')
+    fig1 = plt.figure()
+    plt.title(f'ICP Error vs. Iterations')
+    plt.plot(iterations, errors, linewidth=2)
+    plt.xlabel('Number of Iterations')
+    plt.ylabel('Error')
+    plt.grid()
+    fig1.savefig(f'error_vs_iterations_{target_files}.png')
+    plt.show()
 
-    utils.view_pc([pc_source_old, pc_source, pc_target], None, ['g', 'b', 'r'], ['o', 'o', '^'])
-    plt.axis([-0.15, 0.15, -0.15, 0.15])
+    fig2 = plt.figure()
+    ax = fig2.add_subplot(111, projection='3d')
+    ax.set_title('ICP Alignment Result')
+    ax.scatter([p[0] for p in pc_target], [p[1] for p in pc_target], [p[2] for p in pc_target], c='r', marker='^', label='Target')
+    ax.scatter([p[0] for p in pc_source_old], [p[1] for p in pc_source_old], [p[2] for p in pc_source_old], c='g', marker='s', label='Initial')
+    ax.scatter([p[0] for p in pc_source], [p[1] for p in pc_source], [p[2] for p in pc_source], c='y', marker='o', label='Final')
+    ax.legend()
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    # 使用pc_target文件名作为图片名
+    fig2.savefig(f'icp_alignment_result_{target_files}.png')
 
-
-    print(pc_source)
-    utils.view_pc([pc_source, pc_target], None, ['b', 'r'], ['o', '^'])
-    plt.axis([-0.15, 0.15, -0.15, 0.15, -0.15, 0.15])
+    # print(pc_source)
     ###YOUR CODE HERE###
 
     plt.show()
-    #raw_input("Press enter to end:")
+    # raw_input("Press enter to end:")
 
 
 if __name__ == '__main__':
