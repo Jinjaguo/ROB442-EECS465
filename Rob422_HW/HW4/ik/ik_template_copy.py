@@ -13,6 +13,35 @@ from PIL import Image
 from utils import draw_sphere_marker
 
 
+def save_gif(frames, filename="output.gif", duration=100):
+    frames[0].save(filename, save_all=True, append_images=frames[1:], duration=duration, loop=0)
+
+
+def get_nullspace_projection(J):
+    J_pinv = get_jacobian_pinv(J)
+    return np.eye(J.shape[1]) - J_pinv @ J
+
+
+def repel_from_limits(q, joint_limits, beta):
+    velocity = np.zeros_like(q)
+    for i, config in enumerate(q.flatten()):
+        lower, upper = joint_limits[i]
+        mid = (lower + upper) / 2
+        distance = mid - config
+
+        if config < mid:
+            velocity[0, i] = beta * distance
+            # distance = max(mid - config, 1e-6)
+            # distance = max(config - lower, 1e-4)
+            # velocity[0, i] = beta * (1 / distance - 1 / (mid - lower))
+        else:
+            velocity[0, i] = beta * distance
+            # distance = min(mid - config, -1e-6)
+            # distance = min(config - upper, -1e-4)
+            # velocity[0, i] = beta * (1 / distance - 1 / (mid - upper))
+    return velocity
+
+
 def get_ee_transform(robot, joint_indices, joint_vals=None):
     # returns end-effector transform in the world frame with input joint configuration or with current configuration if not specified
     if joint_vals is not None:
@@ -62,7 +91,7 @@ def set_joint_positions_np(robot, joints, q_arr):
 
 def get_translation_jacobian(robot, joint_indices):
     J = np.zeros((3, len(joint_indices)))
-    end_effector_position = get_ee_transform(robot, joint_indices)
+    end_effector_position = get_ee_transform(robot, joint_indices)[:3, 3]
     for i, joint_idx in enumerate(joint_indices):
         j_info = p.getJointInfo(robot, joint_idx)  # 获取单个关节的信息
         joint_type = j_info[2]  # 获取关节类型
@@ -110,12 +139,8 @@ def get_full_jacobian(robot, joint_indices):
 
 
 def get_jacobian_pinv(J):
-    J_pinv = []
-    for i in range(J.shape[1]):
-        J_i = J[:, i]
-        J_i_pinv = np.linalg.pinv(J_i)
-        J_pinv.append(J_i_pinv)
-        J_pinv = np.array(J_pinv).T
+    lamda = 0.01  # 正则化参数
+    J_pinv = J.T @ np.linalg.inv(J @ J.T + lamda ** 2 * np.eye(J.shape[0]))
     return J_pinv
 
 
@@ -125,25 +150,6 @@ def tuck_arm(robot):
     joint_idx = [joint_from_name(robot, jn) for jn in joint_names]
     set_joint_positions(robot, joint_idx,
                         (0.24, 1.29023451, -2.32099996, -0.69800004, 1.27843491, -2.32100002, -0.69799996))
-
-
-def get_nullspace_projection(J):
-    J_pinv = get_jacobian_pinv(J)
-    return np.eye(J.shape[1]) - J_pinv @ J
-
-
-def repel_from_limits(q, joint_limits, beta):
-    velocity = np.zeros_like(q)
-    for i, config in enumerate(q.flatten()):
-        lower, upper = joint_limits[i]
-        mid = (lower + upper) / 2
-        distance = mid - config
-
-        if config < mid:
-            velocity[0, i] = beta * distance
-        else:
-            velocity[0, i] = beta * distance
-    return velocity
 
 
 def main():
@@ -190,7 +196,6 @@ def main():
 
     for target in targets:
         draw_sphere_marker(target, 0.05, (1, 0, 0, 1))
-
     # define joint limits
     joint_limits = {joint_names[i]: (
         get_joint_info(robot, joint_idx[i]).jointLowerLimit, get_joint_info(robot, joint_idx[i]).jointUpperLimit) for i
@@ -198,12 +203,11 @@ def main():
         range(len(joint_idx))}
     q = np.zeros((1, len(joint_names)))  # start at this configuration
     target = targets[test_idx]
-    draw_sphere_marker(target, 0.05, (1, 0, 0, 1))
 
     max_iters = 100  # 最大迭代次数
     threshold = 0.01  # 误差阈值
     alpha = 0.1  # 学习率/步长因子
-    beta = 1e-4  # 冲量因子
+    beta = 1e-4
 
     joint_limit = np.array([[value[0], value[1]] for value in joint_limits.values()])
     joint_limit[4] = [-np.pi, np.pi]
@@ -212,7 +216,7 @@ def main():
     for _ in range(max_iters):
         set_joint_positions_np(robot, joint_idx, q)
         current = get_ee_transform(robot, joint_idx)[:3, 3]
-        # draw_sphere_marker(current, 0.05, (1, 0, 0, 1))
+        draw_sphere_marker(current, 0.05, (1, 0, 0, 1))
 
         error = target - current
         if np.linalg.norm(error) < threshold:
@@ -236,28 +240,30 @@ def main():
             lower, upper = joint_limit[i]
             q[0, i] = np.clip(q[0, i] + delta, lower, upper)
 
-        width, height, rgb_img, _, _ = p.getCameraImage(
-            width=320,
-            height=240,
-            viewMatrix=p.computeViewMatrixFromYawPitchRoll(
-                cameraTargetPosition=cam_target_pos,
-                distance=cam_distance,
-                yaw=yaw,
-                pitch=pitch,
-                roll=0,
-                upAxisIndex=2
-            ),
-            projectionMatrix=p.computeProjectionMatrixFOV(
-                fov=60,
-                aspect=1.0,
-                nearVal=0.1,
-                farVal=100.0
+            width, height, rgb_img, _, _ = p.getCameraImage(
+                width=320,
+                height=240,
+                viewMatrix=p.computeViewMatrixFromYawPitchRoll(
+                    cameraTargetPosition=cam_target_pos,
+                    distance=cam_distance,
+                    yaw=yaw,
+                    pitch=pitch,
+                    roll=0,
+                    upAxisIndex=2
+                ),
+                projectionMatrix=p.computeProjectionMatrixFOV(
+                    fov=60,
+                    aspect=1.0,
+                    nearVal=0.1,
+                    farVal=100.0
+                )
             )
-        )
-        img = Image.fromarray(rgb_img)
-        frames.append(img)
-        # 重新渲染场景
-        time.sleep(0.01)
+            img = Image.fromarray(rgb_img)
+            frames.append(img)
+            # 重新渲染场景
+            time.sleep(0.01)
+    save_gif(frames, filename="simulation.gif", duration=100)
+    print('The configuration of robot is', q)
 
     wait_if_gui()
     disconnect()
