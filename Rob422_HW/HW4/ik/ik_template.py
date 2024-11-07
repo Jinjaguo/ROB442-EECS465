@@ -189,6 +189,7 @@ def main():
 
     for _ in range(max_iters):
         set_joint_positions_np(robot, joint_idx, q)
+        p.stepSimulation()
         current = get_ee_transform(robot, joint_idx)[:3, 3]
         draw_sphere_marker(current, 0.05, (0, 0, 1, 1))
 
