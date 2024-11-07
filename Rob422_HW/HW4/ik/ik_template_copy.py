@@ -170,6 +170,7 @@ def main():
     threshold = 0.01  # 误差阈值
     alpha = 0.1  # 学习率/步长因子
     lamda = 0.01  # 正则化参数
+    beta = 0.5  # 次要任务权重
     for target in targets:
         set_joint_positions_np(robot, joint_idx, q)
         print(f"Moving to target: {target}")
@@ -190,7 +191,25 @@ def main():
 
             # 使用伪逆求解关节角速度
             J_pseudo_inverse = np.dot(J_full.T, np.linalg.inv(np.dot(J_full, J_full.T) + np.eye(6) * np.power(lamda, 2)))
-            delta_q = np.dot(J_pseudo_inverse, np.hstack((position_error, np.zeros(3))))  # 仅考虑位置误差
+            delta_q_primary = np.dot(J_pseudo_inverse, np.hstack((position_error, np.zeros(3))))  # 仅考虑位置误差
+
+            # 次要任务：生成一个速度方向远离关节限制
+            delta_q_null = np.zeros(len(joint_idx))
+            for i in range(len(joint_idx)):
+                current_q = q_arr[0, i]
+                lower_limit, upper_limit = joint_limits[joint_names[i]]
+
+                # 计算偏离关节限制的速度
+                if current_q < lower_limit + 0.1 * (upper_limit - lower_limit):
+                    delta_q_null[i] = beta * (lower_limit - current_q)
+                elif current_q > upper_limit - 0.1 * (upper_limit - lower_limit):
+                    delta_q_null[i] = beta * (upper_limit - current_q)
+
+            # 将次要任务投影到左零空间
+            delta_q_secondary = np.dot((np.eye(len(joint_idx)) - np.dot(J_pseudo_inverse, J_full)), delta_q_null)
+
+            # 总的关节速度更新
+            delta_q = delta_q_primary + delta_q_secondary
 
             # 更新关节角度
             q_arr[0, :] += alpha * delta_q
