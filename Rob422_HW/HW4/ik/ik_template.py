@@ -156,9 +156,6 @@ def main():
     camera_target_position = [-0.75, -0.07551, 0.42]  # 摄像机目标位置
     p.resetDebugVisualizerCamera(camera_distance, camera_yaw, camera_pitch, camera_target_position)
 
-    # 保存每一帧的图像列表
-    frames = []
-
     # define active DoFs
     joint_names = ['l_shoulder_pan_joint', 'l_shoulder_lift_joint', 'l_upper_arm_roll_joint',
                    'l_elbow_flex_joint', 'l_forearm_roll_joint', 'l_wrist_flex_joint', 'l_wrist_roll_joint']
@@ -211,36 +208,6 @@ def main():
             lower, upper = joint_limit[i]
             q[0, i] = np.clip(q[0, i] + delta, lower, upper)
 
-        # 每次迭代时获取当前视角的图像，并保存为帧
-        width, height, rgb_img, _, _ = p.getCameraImage(
-            width=320,
-            height=240,
-            viewMatrix=p.computeViewMatrixFromYawPitchRoll(
-                cameraTargetPosition=camera_target_position,
-                distance=camera_distance,
-                yaw=camera_yaw,
-                pitch=camera_pitch,
-                roll=0,
-                upAxisIndex=2
-            ),
-            projectionMatrix=p.computeProjectionMatrixFOV(
-                fov=60,
-                aspect=1.0,
-                nearVal=0.1,
-                farVal=100.0
-            )
-        )
-
-        # 转换为 PIL 格式并添加到帧列表中
-        rgb_array = np.array(rgb_img)
-        rgb_array_rgb = rgb_array[:,:,:3]
-        img = Image.fromarray(rgb_array_rgb,"RGB")
-        img.save("1.png")
-        frames.append(img)
-
-        time.sleep(0.01)
-
-    save_gif(frames, filename="simulation.gif", duration=100)
     print('The configuration of robot is', q)
 
     wait_if_gui()

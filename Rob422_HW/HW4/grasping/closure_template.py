@@ -54,7 +54,19 @@ def calculate_friction_cone(contact_force_vector, tangent_dir, mu, num_cone_vect
     cone_edges = None
     _, contact_unit_normal, f_0_pre_rotation = get_f0_pre_rotation(contact_force_vector, mu)
     ### YOUR CODE HERE ###
+    # Generate cone edges by rotating a given vector in a cone-like manner based on specified angles and directions.
+    cone_edges = []
+    beta = np.arctan(mu)
+    tangent_rotation = Rotation.from_rotvec(tangent_dir * beta)
+    f_0 = tangent_rotation.apply(f_0_pre_rotation)
 
+    for i in range(num_cone_vectors):
+        angle = 2 * np.pi * i / num_cone_vectors
+        rotation = Rotation.from_rotvec(contact_unit_normal * angle)
+        cone_edge = rotation.apply(f_0)
+        cone_edges.append(cone_edge)
+
+    cone_edges = np.array(cone_edges)
     ######################
 
     return cone_edges
@@ -80,7 +92,11 @@ def compare_discretization(contact_point, world):
     eight_vector_volume = None
 
     ### YOUR CODE HERE ###
-
+    normal_force_magnitude = np.linalg.norm(contact_force_vector)
+    radius = mu * normal_force_magnitude
+    true_volume = np.pi * radius ** 2 * normal_force_magnitude / 3
+    four_vector_volume = ConvexHull(np.vstack((four_vector, np.zeros(3)))).volume
+    eight_vector_volume = ConvexHull(np.vstack((eight_vector, np.zeros(3)))).volume
     ######################
 
     print('True volume:', np.round(true_volume, 4) if true_volume is not None else 'Not implemented')
@@ -106,7 +122,18 @@ def convex_hull(wrenches):
     max_radius = 0.0
 
     ### YOUR CODE HERE ###
+    hull = ConvexHull(wrenches, qhull_options='QJ')
 
+    for euqation in hull.equations:
+        if euqation[-1] > 0:
+            force_closure_bool = False
+            break
+        else:
+            force_closure_bool = True
+
+    if force_closure_bool:
+        distance = -hull.equations[:, -1]
+        max_radius = np.min(distance)
     ######################
 
     if hull is None:

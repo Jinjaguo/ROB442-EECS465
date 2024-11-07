@@ -173,12 +173,12 @@ def main():
         set_point(robot, (-0.75, -0.07551, 0.02))
     tuck_arm(robot)
 
-    # 设置摄像机视角
-    cam_target_pos = [0, 0, 0.2]
-    cam_distance = 1.5
-    pitch = -30
-    yaw = 90
-    frames = []
+    # initialize PyBullet
+    camera_distance = 3  # 摄像机与目标的距离
+    camera_yaw = 50  # 摄像机的偏航角
+    camera_pitch = -35  # 摄像机的俯仰角
+    camera_target_position = [-0.75, -0.07551, 0.42]  # 摄像机目标位置
+    p.resetDebugVisualizerCamera(camera_distance, camera_yaw, camera_pitch, camera_target_position)
 
     # define active DoFs
     joint_names = ['l_shoulder_pan_joint', 'l_shoulder_lift_joint', 'l_upper_arm_roll_joint',
@@ -240,29 +240,6 @@ def main():
             lower, upper = joint_limit[i]
             q[0, i] = np.clip(q[0, i] + delta, lower, upper)
 
-            width, height, rgb_img, _, _ = p.getCameraImage(
-                width=320,
-                height=240,
-                viewMatrix=p.computeViewMatrixFromYawPitchRoll(
-                    cameraTargetPosition=cam_target_pos,
-                    distance=cam_distance,
-                    yaw=yaw,
-                    pitch=pitch,
-                    roll=0,
-                    upAxisIndex=2
-                ),
-                projectionMatrix=p.computeProjectionMatrixFOV(
-                    fov=60,
-                    aspect=1.0,
-                    nearVal=0.1,
-                    farVal=100.0
-                )
-            )
-            img = Image.fromarray(rgb_img)
-            frames.append(img)
-            # 重新渲染场景
-            time.sleep(0.01)
-    save_gif(frames, filename="simulation.gif", duration=100)
     print('The configuration of robot is', q)
 
     wait_if_gui()
