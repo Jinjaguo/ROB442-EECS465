@@ -59,8 +59,9 @@ def set_joint_positions_np(robot, joints, q_arr):
     set_joint_positions(robot, joints, q)
 
 
-def get_translation_jacobian(robot, joint_indices, end_effector_position):
+def get_translation_jacobian(robot, joint_indices):
     J = np.zeros((3, len(joint_indices)))
+    end_effector_position = get_ee_transform(robot, joint_indices)
     for i, joint_idx in enumerate(joint_indices):
         j_info = p.getJointInfo(robot, joint_idx)  # 获取单个关节的信息
         joint_type = j_info[2]  # 获取关节类型
@@ -96,9 +97,9 @@ def get_rotation_jacobian(robot, joint_indices):
     return J_rotation
 
 
-def get_full_jacobian(robot, joint_indices, end_effector_position):
+def get_full_jacobian(robot, joint_indices):
     # 计算平移部分雅可比矩阵
-    J_translation = get_translation_jacobian(robot, joint_indices, end_effector_position)
+    J_translation = get_translation_jacobian(robot, joint_indices)
     # 计算旋转部分雅可比矩阵
     J_rotation = get_rotation_jacobian(robot, joint_indices)
 
@@ -123,6 +124,25 @@ def tuck_arm(robot):
     joint_idx = [joint_from_name(robot, jn) for jn in joint_names]
     set_joint_positions(robot, joint_idx,
                         (0.24, 1.29023451, -2.32099996, -0.69800004, 1.27843491, -2.32100002, -0.69799996))
+
+
+def get_nullspace_projection(J):
+    J_pinv = get_jacobian_pinv(J)
+    return np.eye(J.shape[1]) - J_pinv @ J
+
+
+def repel_from_limits(q, joint_limits, beta):
+    velocity = np.zeros_like(q)
+    for i, config in enumerate(q.flatten()):
+        lower, upper = joint_limits[i]
+        mid = (lower + upper) / 2
+        distance = mid - config
+
+        if config < mid:
+            velocity[0, i] = beta * distance
+        else:
+            velocity[0, i] = beta * distance
+    return velocity
 
 
 def main():
@@ -169,68 +189,41 @@ def main():
     max_iters = 100  # 最大迭代次数
     threshold = 0.01  # 误差阈值
     alpha = 0.1  # 学习率/步长因子
-    lamda = 0.01  # 正则化参数
-    beta = 0.5  # 次要任务权重
-    for target in targets:
+    beta = 1e-4  # 冲量因子
+
+    joint_limit = np.array([[value[0], value[1]] for value in joint_limits.values()])
+    joint_limit[4] = [-np.pi, np.pi]
+    joint_limit[-1] = [-np.pi, np.pi]
+
+    for _ in range(max_iters):
         set_joint_positions_np(robot, joint_idx, q)
-        print(f"Moving to target: {target}")
-        # draw a blue sphere at the target
-        draw_sphere_marker(target, 0.05, (0, 0, 1, 1))
-        # 开始迭代
-        for _ in range(max_iters):
-            # 计算当前末端位置
-            current_transform = get_ee_transform(robot, joint_idx)[:3, 3]
-            current_position = current_transform[:3, 3]
-            position_error = np.array(target) - current_position
-            error_norm = np.linalg.norm(position_error)
-            if error_norm < threshold:
-                print("Target reached!")
-                break
-            # 计算雅可比矩阵
-            J_full = get_full_jacobian(robot, joint_idx, current_position)
+        current = get_ee_transform(robot, joint_idx)[:3, 3]
+        # draw_sphere_marker(current, 0.05, (1, 0, 0, 1))
 
-            # 使用伪逆求解关节角速度
-            J_pseudo_inverse = np.dot(J_full.T, np.linalg.inv(np.dot(J_full, J_full.T) + np.eye(6) * np.power(lamda, 2)))
-            delta_q_primary = np.dot(J_pseudo_inverse, np.hstack((position_error, np.zeros(3))))  # 仅考虑位置误差
+        error = target - current
+        if np.linalg.norm(error) < threshold:
+            np.set_printoptions(precision=5, suppress=True)
+            print("The configuration is: ", q)
+            break
 
-            # 次要任务：生成一个速度方向远离关节限制
-            delta_q_null = np.zeros(len(joint_idx))
-            for i in range(len(joint_idx)):
-                current_q = q_arr[0, i]
-                lower_limit, upper_limit = joint_limits[joint_names[i]]
+        J = get_translation_jacobian(robot, joint_idx)
+        J_pinv = get_jacobian_pinv(J)
+        N = get_nullspace_projection(J)
+        velocity = repel_from_limits(q, joint_limit, beta)
 
-                # 计算偏离关节限制的速度
-                if current_q < lower_limit + 0.1 * (upper_limit - lower_limit):
-                    delta_q_null[i] = beta * (lower_limit - current_q)
-                elif current_q > upper_limit - 0.1 * (upper_limit - lower_limit):
-                    delta_q_null[i] = beta * (upper_limit - current_q)
+        delta_q_repal = N @ velocity.T
+        delta_q_primary = J_pinv @ error
+        delta_q = delta_q_primary + delta_q_repal.flatten()
 
-            # 将次要任务投影到左零空间
-            delta_q_secondary = np.dot((np.eye(len(joint_idx)) - np.dot(J_pseudo_inverse, J_full)), delta_q_null)
+        if np.linalg.norm(delta_q) > alpha:
+            delta_q = alpha * delta_q / np.linalg.norm(delta_q)
 
-            # 总的关节速度更新
-            delta_q = delta_q_primary + delta_q_secondary
+        for i, delta in enumerate(delta_q):
+            lower, upper = joint_limit[i]
+            q[0, i] = np.clip(q[0, i] + delta, lower, upper)
 
-            # 更新关节角度
-            q_arr[0, :] += alpha * delta_q
-            set_joint_positions_np(robot, joint_idx, q_arr)
-
-            # 更新关节角度并检查限制
-            for i in range(len(joint_idx)):
-                new_q = q_arr[0, i] + alpha * delta_q[i]
-                lower_limit, upper_limit = joint_limits[joint_names[i]]
-                # 如果新的关节角度超出限制，则设置为限制值
-                if new_q < lower_limit:
-                    q_arr[0, i] = lower_limit
-                elif new_q > upper_limit:
-                    q_arr[0, i] = upper_limit
-                else:
-                    q_arr[0, i] = new_q
-            # 应用关节角度
-            set_joint_positions_np(robot, joint_idx, q_arr)
-
-            # 重新渲染场景
-            time.sleep(0.01)
+        # 重新渲染场景
+        time.sleep(0.01)
 
     wait_if_gui()
     disconnect()
