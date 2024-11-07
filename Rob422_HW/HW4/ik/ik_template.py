@@ -155,6 +155,9 @@ def main():
                [-0.56491217, 0.011443, 1.2922572],
                [-1.07012697, 0.81909669, 0.47344636],
                [-1.11050811, 0.97000718, 1.31087581]]
+
+    for target in targets:
+        draw_sphere_marker(target,0.05,(1,0,0,1))
     # define joint limits
     joint_limits = {joint_names[i]: (
         get_joint_info(robot, joint_idx[i]).jointLowerLimit, get_joint_info(robot, joint_idx[i]).jointUpperLimit) for i
@@ -173,7 +176,7 @@ def main():
     for _ in range(max_iters):
         set_joint_positions_np(robot, joint_idx, q)
         current = get_ee_transform(robot, joint_idx)[:3, 3]
-        # draw_sphere_marker(current, 0.05, (1, 0, 0, 1))
+        draw_sphere_marker(current, 0.05, (0, 0, 1, 1))
 
         error = target - current
         if np.linalg.norm(error) < threshold:
@@ -195,6 +198,8 @@ def main():
 
             # 重新渲染场景
             time.sleep(0.01)
+
+    print('The configuration of robot is',q)
 
     wait_if_gui()
     disconnect()
