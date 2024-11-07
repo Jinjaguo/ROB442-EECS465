@@ -7,6 +7,7 @@ import time
 import sys
 ### YOUR IMPORTS HERE ###
 import pybullet as p
+from PIL import Image
 #########################
 
 from utils import draw_sphere_marker
@@ -165,6 +166,14 @@ def main():
         robot = load_model(DRAKE_PR2_URDF, fixed_base=True)
         set_point(robot, (-0.75, -0.07551, 0.02))
     tuck_arm(robot)
+
+    # 设置摄像机视角
+    cam_target_pos = [0, 0, 0.2]
+    cam_distance = 1.5
+    pitch = -30
+    yaw = 90
+    frames = []
+
     # define active DoFs
     joint_names = ['l_shoulder_pan_joint', 'l_shoulder_lift_joint', 'l_upper_arm_roll_joint',
                    'l_elbow_flex_joint', 'l_forearm_roll_joint', 'l_wrist_flex_joint', 'l_wrist_roll_joint']
@@ -178,6 +187,10 @@ def main():
                [-0.56491217, 0.011443, 1.2922572],
                [-1.07012697, 0.81909669, 0.47344636],
                [-1.11050811, 0.97000718, 1.31087581]]
+
+    for target in targets:
+        draw_sphere_marker(target, 0.05, (1, 0, 0, 1))
+
     # define joint limits
     joint_limits = {joint_names[i]: (
         get_joint_info(robot, joint_idx[i]).jointLowerLimit, get_joint_info(robot, joint_idx[i]).jointUpperLimit) for i
@@ -185,6 +198,7 @@ def main():
         range(len(joint_idx))}
     q = np.zeros((1, len(joint_names)))  # start at this configuration
     target = targets[test_idx]
+    draw_sphere_marker(target, 0.05, (1, 0, 0, 1))
 
     max_iters = 100  # 最大迭代次数
     threshold = 0.01  # 误差阈值
@@ -222,6 +236,26 @@ def main():
             lower, upper = joint_limit[i]
             q[0, i] = np.clip(q[0, i] + delta, lower, upper)
 
+        width, height, rgb_img, _, _ = p.getCameraImage(
+            width=320,
+            height=240,
+            viewMatrix=p.computeViewMatrixFromYawPitchRoll(
+                cameraTargetPosition=cam_target_pos,
+                distance=cam_distance,
+                yaw=yaw,
+                pitch=pitch,
+                roll=0,
+                upAxisIndex=2
+            ),
+            projectionMatrix=p.computeProjectionMatrixFOV(
+                fov=60,
+                aspect=1.0,
+                nearVal=0.1,
+                farVal=100.0
+            )
+        )
+        img = Image.fromarray(rgb_img)
+        frames.append(img)
         # 重新渲染场景
         time.sleep(0.01)
 

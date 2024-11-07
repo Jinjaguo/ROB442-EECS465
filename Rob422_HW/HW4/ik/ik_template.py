@@ -110,7 +110,7 @@ def get_full_jacobian(robot, joint_indices):
 
 def get_jacobian_pinv(J):
     lamda = 0.01  # 正则化参数
-    J_pinv = J.T @ np.linalg.inv(J @ J.T + lamda**2 * np.eye(J.shape[0]))
+    J_pinv = J.T @ np.linalg.inv(J @ J.T + lamda ** 2 * np.eye(J.shape[0]))
     return J_pinv
 
 
@@ -157,7 +157,7 @@ def main():
                [-1.11050811, 0.97000718, 1.31087581]]
 
     for target in targets:
-        draw_sphere_marker(target,0.05,(1,0,0,1))
+        draw_sphere_marker(target, 0.05, (1, 0, 0, 1))
     # define joint limits
     joint_limits = {joint_names[i]: (
         get_joint_info(robot, joint_idx[i]).jointLowerLimit, get_joint_info(robot, joint_idx[i]).jointUpperLimit) for i
@@ -199,7 +199,7 @@ def main():
             # 重新渲染场景
             time.sleep(0.01)
 
-    print('The configuration of robot is',q)
+    print('The configuration of robot is', q)
 
     wait_if_gui()
     disconnect()
