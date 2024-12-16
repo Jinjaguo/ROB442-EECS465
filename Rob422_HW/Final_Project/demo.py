@@ -388,7 +388,7 @@ def main():
     connect(use_gui=True)
     
     # Load the environment
-    robots, obstacles = load_env('maze.json')  # Change to 'pr2doorway.json' if needed
+    robots, obstacles = load_env('env1.json')  # Change to 'env2.json' if needed
     base_joints = [joint_from_name(robots['pr2'], name) for name in PR2_GROUPS['base']]
     collision_fn = get_collision_fn_PR2(robots['pr2'], base_joints, list(obstacles.values()))
 
